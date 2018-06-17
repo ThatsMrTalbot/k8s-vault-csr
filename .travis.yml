@@ -1,0 +1,25 @@
+language: go
+go:
+- "1.10"
+go_import_path: github.com/thatsmrtalbot/k8s-vault-csr
+
+env:
+  global:
+  - DEP_VERSION="0.4.1"
+  - USE_DOCKER="0"
+  - VENDOR_ONLY="1"
+
+before_install:
+- curl -L -s https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 -o $GOPATH/bin/dep
+- chmod +x $GOPATH/bin/dep
+
+stages:
+- test
+- build
+
+jobs:
+  include:
+    - stage: test
+      script: make test
+    - stage: build
+      script: make bin/darwin_amd64/k8s-vault-csr bin/linux_amd64/k8s-vault-csr bin/linux_arm64/k8s-vault-csr bin/linux_arm/k8s-vault-csr

@@ -93,17 +93,18 @@ func (r *Renewer) Error() <-chan error {
 	return r.err
 }
 
-func (r *Renewer) Run(done <-chan struct{}) {
+func (r *Renewer) Run(done <-chan struct{}) error  {
 	ticker := time.NewTicker(time.Second)
 	for {
 		select {
 		case <-ticker.C:
 			if err := r.tick(); err != nil {
-				r.err <- err
+				ticker.Stop()			
+				return err
 			}
 		case <-done:
 			ticker.Stop()
-			return
+			return nil 
 		}
 	}
 }
