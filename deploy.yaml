@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-vault-signer
+  namespace: kube-system
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kube-vault-signer
+rules:
+- apiGroups: 
+  - certificates.k8s.io
+  resources: 
+  - certificatesigningrequests
+  - certificatesigningrequests/status
+  verbs: 
+  - get
+  - list
+  - watch
+  - patch
+  - update
+---
+kind: CluterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: kube-vault-signer
+subjects:
+- kind: ServiceAccount
+  name: kube-vault-signer
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: kube-vault-signer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-vault-signer
+  namespace: kube-system
+  labels:
+    k8s-app: kube-vault-signer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-vault-signer
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-vault-signer
+    spec:
+      serviceAccountName: kube-vault-signer
+      containers:
+      - name: kube-vault-signer
+        image: thatsmrtalbot/kube-vault-signer:0.0.1
+        args:
+          - -vault-address=https://vault.example.com
+          - -use-kubernetes-auth=true
+          - -kubernetes-auth-role=kube-vault-signer

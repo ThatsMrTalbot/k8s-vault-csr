@@ -2,6 +2,7 @@ package token
 
 import (
 	"time"
+	"encoding/json"
 	"github.com/golang/glog"
 	"github.com/pkg/errors"
 	"github.com/hashicorp/vault/api"
@@ -9,6 +10,8 @@ import (
 )
 
 var ErrNoAuthProvider = errors.New("no vault authentication method provided")
+
+var infinity = time.Duration(^uint64(0) >> 1)
 
 func NewRenewer(client *api.Client, authFn func(*api.Client) error) *Renewer {
 	if authFn == nil {
@@ -20,7 +23,6 @@ func NewRenewer(client *api.Client, authFn func(*api.Client) error) *Renewer {
 	return &Renewer{
 		client: client,
 		authFn: authFn,
-		err: make(chan error),
 	}
 }
 
@@ -41,6 +43,11 @@ func (r *Renewer) currentTokenStatus() (*tokenStatus, error) {
 		return nil, err
 	}
 
+	ttl, err := secret.Data["ttl"].(json.Number).Int64()
+	if err != nil {
+		return nil, err
+	}
+
 	if time.Now().UTC().After(expires) {
 		return &tokenStatus{
 			HasToken: true,
@@ -51,7 +58,7 @@ func (r *Renewer) currentTokenStatus() (*tokenStatus, error) {
 	return &tokenStatus{
 		HasToken: true,
 		ExpiresIn: time.Now().UTC().Sub(expires),
-		TTL: time.Duration(secret.Data["creation_ttl"].(int)) * time.Second,
+		TTL: time.Duration(ttl) * time.Second,
 	}, nil
 }
 
@@ -87,10 +94,6 @@ func (r *Renewer) tick() error {
 	}
 
 	return nil
-}
-
-func (r *Renewer) Error() <-chan error {
-	return r.err
 }
 
 func (r *Renewer) Run(done <-chan struct{}) error  {

@@ -14,7 +14,6 @@ type tokenStatus struct {
 }
 
 type Renewer struct {
-	err    chan error
 	client *api.Client
 	authFn func(*api.Client) error
 }

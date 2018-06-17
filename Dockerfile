@@ -1,13 +1,19 @@
-FROM golang:1.10.3-alpine as build
+FROM golang:1.10.3 as build
 
-RUN apk add --no-cache git openssh ca-certificates
-RUN wget -O - https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+ARG DEP_VERSION=0.4.1
+
+# install dep
+RUN wget -O /usr/local/bin/dep https://github.com/golang/dep/releases/download/v${DEP_VERSION}/dep-linux-amd64 && \
+    chmod +x /usr/local/bin/dep
+
+# add code
 ADD . /go/src/github.com/thatsmrtalbot/k8s-vault-csr
 WORKDIR /go/src/github.com/thatsmrtalbot/k8s-vault-csr
-RUN dep ensure -vendor-only -v
-RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o /bin/k8s-vault-csr ./cmd/k8s-vault-csr
 
+# vendor and build
+RUN make bin/linux_amd64/k8s-vault-csr USE_DOCKER=0 VENDOR_ONLY=1
+
+# final container
 FROM scratch
-
-COPY --from=build /bin/k8s-vault-csr /bin/k8s-vault-csr
+COPY --from=build /go/src/github.com/thatsmrtalbot/k8s-vault-csr/bin/linux_amd64/k8s-vault-csr /bin/k8s-vault-csr
 ENTRYPOINT [ "/bin/k8s-vault-csr" ]
