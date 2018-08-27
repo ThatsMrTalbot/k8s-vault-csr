@@ -23,7 +23,7 @@ jobs:
       script: make test
     - stage: build
       script: 
-        - make release/{darwin-amd64,linux-amd64,linux-arm64,linux-arm}-k8s-vault-csr
+        - make release/{darwin-amd64,linux-amd64,linux-arm64,linux-arm}-k8s-vault-csr VERSION=${TRAVIS_TAG}
       deploy:
         provider: releases
         api_key:

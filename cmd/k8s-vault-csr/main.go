@@ -5,6 +5,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +23,9 @@ import (
 
 // EnvPrefix is the prefix used when setting flags via environment vars
 const EnvPrefix = "VAULT_CSR_SIGNER"
+
+// Version is the application version set by the compiler
+var Version = ""
 
 var (
 	// Kubernetes flags
@@ -88,6 +92,8 @@ func flagsFromEnv() {
 
 // main is the application entrypoint
 func main() {
+	glog.Infof("application starting version=%s runtime=%s", Version, runtime.Version())
+
 	// create vault client and renewer
 	client, err := api.NewClient(&api.Config{
 		Address:    *vaultAddr,
@@ -95,7 +101,7 @@ func main() {
 	})
 
 	if err != nil {
-		glog.Fatal(err.Error())
+		glog.Fatalf("create vault client: %s", err)
 	}
 
 	renewer := token.NewRenewer(client, authProvider())
@@ -109,7 +115,7 @@ func main() {
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		glog.Fatal(err.Error())
+		glog.Fatalf("create kubernetes config: %s", err)
 	}
 
 	// create informer factory
@@ -125,7 +131,7 @@ func main() {
 	)
 
 	if err != nil {
-		glog.Fatal(err.Error())
+		glog.Fatalf("create vault signing controller: %s", err)
 	}
 
 	// start workers
@@ -146,12 +152,12 @@ func main() {
 
 	select {
 	case <-term:
-		glog.Error("received SIGTERM, exiting gracefully...")
+		glog.Info("received SIGTERM, exiting gracefully...")
 	case <-ctx.Done():
 	}
 
 	cancel()
 	if err := wg.Wait(); err != nil {
-		glog.Exitf("unhandled error received: %s", err)
+		glog.Fatalf("unhandled error received: %s", err)
 	}
 }
