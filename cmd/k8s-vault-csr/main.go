@@ -68,7 +68,7 @@ func authProvider() token.AuthProvider {
 		return nil
 	}
 
-	glog.Fatalf("unknown auth method: %s", vaultAuth)
+	glog.Fatalf("unknown auth method: %s", *vaultAuth)
 
 	return nil
 }
