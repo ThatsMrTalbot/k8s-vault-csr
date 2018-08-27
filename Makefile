@@ -12,12 +12,12 @@ RUN_DEP        = $(if $(filter-out 0,$(USE_DOCKER)),$(DOCKER_RUN_DEP),$(NATIVE_D
 PLATFORMS      = linux_amd64 darwin_amd64
 .DEFAULT_GOAL  := build
 
-bin/linux_%/$(BINARY):   GOOS=linux
-bin/darwin_%/$(BINARY):  GOOS=darwin
-bin/%_amd64/$(BINARY):   GOARCH=amd64
-bin/%_arm64/$(BINARY):   GOARCH=arm64
-bin/%_386/$(BINARY):     GOARCH=386
-bin/%_arm/$(BINARY):     GOARCH=arm
+bin/linux_%/$(BINARY) release/linux-%-$(BINARY):   GOOS=linux
+bin/darwin_%/$(BINARY) release/darwin-%-$(BINARY): GOOS=darwin
+bin/%_amd64/$(BINARY) release/%-amd64-$(BINARY):   GOARCH=amd64
+bin/%_arm64/$(BINARY) release/%-arm64-$(BINARY):   GOARCH=arm64
+bin/%_386/$(BINARY) release/%-386-$(BINARY):       GOARCH=386
+bin/%_arm/$(BINARY) release/%-arm-$(BINARY):       GOARCH=arm
 
 vendor: Gopkg.toml
 	@$(RUN_DEP) ensure -v $(if $(filter-out 0,$(VENDOR_ONLY)),-vendor-only)
@@ -33,3 +33,12 @@ test: vendor
 
 .PHONY: build
 build: $(addprefix bin/,$(addsuffix /$(BINARY),$(PLATFORMS)))
+
+.PHONY: clean
+clean:	
+	rm -rf bin release vendor
+
+.SECONDEXPANSION: 
+release/%: bin/$$(GOOS)-$$(GOARCH)/$(BINARY)
+	@mkdir -p release
+	@cp bin/$(GOOS)-$(GOARCH)/$(BINARY) release/$(GOOS)-$(GOARCH)-$(BINARY) 

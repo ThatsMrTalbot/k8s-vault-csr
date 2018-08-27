@@ -1,6 +1,6 @@
 language: go
 go:
-- "1.10"
+- "1.11"
 go_import_path: github.com/thatsmrtalbot/k8s-vault-csr
 
 env:
@@ -23,13 +23,7 @@ jobs:
       script: make test
     - stage: build
       script: 
-        - make bin/darwin_amd64/k8s-vault-csr bin/linux_amd64/k8s-vault-csr bin/linux_arm64/k8s-vault-csr bin/linux_arm/k8s-vault-csr
-        - rm -rf release
-        - mv release
-        - cp bin/darwin_amd64/k8s-vault-csr release/darwin-amd64-k8s-vault-csr
-        - cp bin/linux_amd64/k8s-vault-csr release/linux-amd64-k8s-vault-csr
-        - cp bin/linux_arm64/k8s-vault-csr release/linux-arm64-k8s-vault-csr
-        - cp bin/linux_arm/k8s-vault-csr release/linux-arm-k8s-vault-csr
+        - make release/{darwin-amd64,linux-amd64,linux-arm64,linux-arm}-k8s-vault-csr
       deploy:
         provider: releases
         api_key:
