@@ -22,16 +22,19 @@ jobs:
     - stage: test
       script: make test
     - stage: build
-      script: make bin/darwin_amd64/k8s-vault-csr bin/linux_amd64/k8s-vault-csr bin/linux_arm64/k8s-vault-csr bin/linux_arm/k8s-vault-csr
+      script: 
+        - make bin/darwin_amd64/k8s-vault-csr bin/linux_amd64/k8s-vault-csr bin/linux_arm64/k8s-vault-csr bin/linux_arm/k8s-vault-csr
+        - rm -rf release
+        - mv release
+        - cp bin/darwin_amd64/k8s-vault-csr release/darwin-amd64-k8s-vault-csr
+        - cp bin/linux_amd64/k8s-vault-csr release/linux-amd64-k8s-vault-csr
+        - cp bin/linux_arm64/k8s-vault-csr release/linux-arm64-k8s-vault-csr
+        - cp bin/linux_arm/k8s-vault-csr release/linux-arm-k8s-vault-csr
       deploy:
         provider: releases
         api_key:
           secure: "GpcAkFWnFtCMCbQCW/KUbsfJVyp97WWzdigcrMD1yTqz2g4Yv4/ElbUT6UG7s90JhYlMtislaKuI02Z6hUnCcPde8M/Lu06gxgW67FZ2GAI/xFHFIh5qXkjiC4y/77JkUjHcFSc/54TiN35i49U7GlKHJZU289Svr5CC+7c69HuZ37pPkflRYagUnghCZ0tK4pzxVk3ZyIwvoiswmp0eLysz+Ng8azGxdbRFNOyYAP3V3pOyH3xuuhjQ/3iJ5p/PyDTmKZWt7UCcGW5vVEuHfrjUyxm/mF388tIkNwOvKJn2bVcm01QesS4jbYxvk8krg2F0mW0uvg9PaWojkuWsNLh0k7ZuHiTm+KcHFMXFc3cgGHP7EQtN7UfjQj59LUC3fI3iRbVaKeg9wexPFqh05Ompe3ls5krsK27TvYBxNFqRPbO18+DWQIicZSvWT/wPAcxbWbd35JHWJysAS7vDhiTPWLCsFV1yEPjKGs4tDH1AvE3LZ9tBNYspNfbnYr2fkYYCbCxEb2iOUGJ8SDL3XDXFxb1hzGV3J2XzBbjgHwSPXsE46aVG5S/58akCGSfdMVVNzmuVj1PwXpLpLkkGeKHMQqN5ZwwuiNYJOlspcf4JIBsfXNTS7HcCih9pVTDY4Xj2JnRXT5WmHXXZYXNCDzEoT48asBZI+9cXHD4ZGMg="
-        file: 
-        - bin/darwin_amd64/k8s-vault-csr
-        - bin/linux_amd64/k8s-vault-csr
-        - bin/linux_arm64/k8s-vault-csr
-        - bin/linux_arm/k8s-vault-csr
+        file: release/*
         skip_cleanup: true
         on:
           tags: true
