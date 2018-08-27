@@ -25,10 +25,13 @@ type tokenStatus struct {
 // vault client has built in support for retrying failed requests, so a single
 // failure should not cause an error.
 type Renewer struct {
-	client *api.Client
-	authFn AuthProvider
+	client       *api.Client
+	authProvider AuthProvider
 }
 
 // AuthMethod the method used to authenticate against vault and update the
 // client token.
-type AuthProvider func(*api.Client) error
+type AuthProvider interface {
+	Auth(*api.Client) error
+	String() string
+}

@@ -1,163 +1,81 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"os"
-	"os/signal"
+	"fmt"
 	"runtime"
-	"strings"
-	"syscall"
-	"time"
 
 	"github.com/golang/glog"
-	"github.com/hashicorp/vault/api"
-	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/controller/certificate/signer"
-	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/vault/token"
-	"golang.org/x/sync/errgroup"
+	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
+	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/cmd/bootstrap"
+	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/cmd/controller"
+	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/util"
 	"k8s.io/apiserver/pkg/util/logs"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // EnvPrefix is the prefix used when setting flags via environment vars
-const EnvPrefix = "VAULT_CSR_SIGNER"
+const EnvPrefix = "K8S_VAULT_CSR"
 
 // Version is the application version set by the compiler
-var Version = ""
+var Version = "devel"
 
-var (
-	// Kubernetes flags
-	masterAddr = flag.String("master", "", "kubernetes master url")
-	kubeconfig = flag.String("kubeconfig", "", "kubeconfig file to use")
+var rootCmd = &cobra.Command{
+	Use:   "k8s-vault-csr",
+	Short: "tools for managing kubernetes certs with vault",
+	Args:  cobra.NoArgs,
+	Long: `Kubernetes Vault CSR tools.
 
-	// Vault generic flags
-	vaultAddr = flag.String("vault-address", "", "vault server address")
-	vaultAuth = flag.String("vault-auth", "", "method to use for vault auth (kubernetes | approle)")
+  Tools to manage and bootstrap Kubernetes certificates
+  using Vault.
+	
+  It can sign Kubernetes CSRs as a controller in order
+  to facilitate Node cert rotation. 
+  
+  It also contains a tool for generating a bootstrap
+  certificates that nodes can use in order to generate
+  their initial certificate`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		util.ParsePFlagsFromEnv(EnvPrefix, cmd.Flags())
+	},
+}
 
-	// Vault Kubernetes auth flags
-	serviceTokenMount = flag.String("kubernetes-auth-mount", "kubernetes", "name of the kubernetes auth mount in vault")
-	serviceTokenRole  = flag.String("kubernetes-auth-role", "", "role to use when authenticating with vault using the service token")
-	serviceTokenFile  = flag.String("kubernetes-auth-token-file", "/var/run/secrets/kubernetes.io/serviceaccount", "file to load service token from")
+var docsCmd = &cobra.Command{
+	Use:   "docs [path]",
+	Short: "generate markdown docs for commands",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		err := doc.GenMarkdownTree(rootCmd, args[0])
+		if err != nil {
+			glog.Exitf("error generating markdown docs: %s", err)
+		}
+	},
+}
 
-	// Vault AppRole auth flags
-	appRoleRoleMount = flag.String("approle-auth-mount", "", "name of the approle auth mount in vault")
-	appRoleRoleID    = flag.String("approle-auth-roleid", "", "vault role id to use when authenticating with an approle")
-	appRoleSecretID  = flag.String("approle-auth-secretid", "", "vault secret id to use when authenticating with an approle")
-
-	// Controller flags
-	workers = flag.Int("signer-workers", 4, "number of signing workers to run")
-
-	// Vault PKI flags
-	pkiMount = flag.String("vault-pki-mount", "pki", "specify the pki mount to use to generate certificates")
-	pkiRole  = flag.String("vault-pki-role", "", "specify role to use, only ttl is used from the role")
-)
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "print the command version",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("version=%s runtime=%s\n", rootCmd.Version, runtime.Version())
+	},
+}
 
 // init sets up logs and parses flags
 func init() {
 	logs.InitLogs()
-	flagsFromEnv()
-	flag.Parse()
+	rootCmd.Version = Version
+	rootCmd.AddCommand(bootstrap.Cmd, controller.Cmd, docsCmd, versionCmd)
+
+	// Setup glog
+	rootCmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	rootCmd.Flag("logtostderr").DefValue = "true"
+	rootCmd.Flag("logtostderr").Value.Set("true")
+	flag.CommandLine.Parse(nil)
 }
 
-// authProvider gets the token auth provider from the flags provided
-func authProvider() token.AuthProvider {
-	switch *vaultAuth {
-	case "kubernetes":
-		return token.KubernetesAuth(*serviceTokenMount, *serviceTokenRole, *serviceTokenFile)
-	case "approle":
-		return token.AppRoleAuth(*appRoleRoleMount, *appRoleRoleID, *appRoleSecretID)
-	case "":
-		return nil
-	}
-
-	glog.Fatalf("unknown auth method: %s", *vaultAuth)
-
-	return nil
-}
-
-// flagsFromEnv visits all the flags and checks to see if a corresponding environment variable
-// is set, if it is then the flag value is changed to environment variables value
-func flagsFromEnv() {
-	flag.VisitAll(func(f *flag.Flag) {
-		env := EnvPrefix + "_" + strings.ToUpper(strings.Replace(f.Name, "-", "_", -1))
-		val := os.Getenv(env)
-
-		if val != "" {
-			flag.Set(f.Name, val)
-		}
-	})
-}
-
-// main is the application entrypoint
 func main() {
-	glog.Infof("application starting version=%s runtime=%s", Version, runtime.Version())
-
-	// create vault client and renewer
-	client, err := api.NewClient(&api.Config{
-		Address:    *vaultAddr,
-		MaxRetries: 10,
-	})
-
+	err := rootCmd.Execute()
 	if err != nil {
-		glog.Fatalf("create vault client: %s", err)
-	}
-
-	renewer := token.NewRenewer(client, authProvider())
-
-	// creates the in-cluster config
-	config, err := clientcmd.BuildConfigFromFlags(*masterAddr, *kubeconfig)
-	if err != nil {
-		glog.Fatal(err.Error())
-	}
-
-	// creates the clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		glog.Fatalf("create kubernetes config: %s", err)
-	}
-
-	// create informer factory
-	factory := informers.NewSharedInformerFactory(clientset, time.Minute*5)
-
-	// create signing controller
-	signing, err := signer.NewVaultSigningController(
-		clientset,
-		factory.Certificates().V1beta1().CertificateSigningRequests(),
-		client,
-		*pkiMount,
-		*pkiRole,
-	)
-
-	if err != nil {
-		glog.Fatalf("create vault signing controller: %s", err)
-	}
-
-	// start workers
-	ctx, cancel := context.WithCancel(context.Background())
-	wg, ctx := errgroup.WithContext(ctx)
-
-	wg.Go(func() error {
-		signing.Run(*workers, ctx.Done())
-		return nil
-	})
-
-	wg.Go(func() error {
-		return renewer.Run(ctx.Done())
-	})
-
-	term := make(chan os.Signal)
-	signal.Notify(term, os.Interrupt, syscall.SIGTERM)
-
-	select {
-	case <-term:
-		glog.Info("received SIGTERM, exiting gracefully...")
-	case <-ctx.Done():
-	}
-
-	cancel()
-	if err := wg.Wait(); err != nil {
-		glog.Fatalf("unhandled error received: %s", err)
+		glog.Exitf("error: ", err)
 	}
 }

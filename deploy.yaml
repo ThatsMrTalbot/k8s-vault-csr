@@ -4,23 +4,6 @@ metadata:
   name: kube-vault-signer
   namespace: kube-system
 ---
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: kube-vault-signer
-rules:
-- apiGroups: 
-  - certificates.k8s.io
-  resources: 
-  - certificatesigningrequests
-  - certificatesigningrequests/status
-  verbs: 
-  - get
-  - list
-  - watch
-  - patch
-  - update
----
 kind: CluterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
 metadata:
@@ -31,7 +14,7 @@ subjects:
   namespace: kube-system
 roleRef:
   kind: ClusterRole
-  name: kube-vault-signer
+  name: system:controller:certificate-controller
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: apps/v1
@@ -54,8 +37,9 @@ spec:
       serviceAccountName: kube-vault-signer
       containers:
       - name: kube-vault-signer
-        image: thatsmrtalbot/kube-vault-signer:0.0.1
+        image: thatsmrtalbot/kube-vault-signer:__VERSION__
         args:
+          - controller
           - -vault-address=https://vault.example.com
-          - -use-kubernetes-auth=true
+          - -vault-auth=kubernetes
           - -kubernetes-auth-role=kube-vault-signer

@@ -13,64 +13,80 @@ import (
 // info when requested from the vault server.
 var ErrNoAuthInfo = errors.New("no auth info returned")
 
-// KubernetesAuth authenticates against Vault using a Kubernetes service token.
-func KubernetesAuth(mount, role, tokenfile string) AuthProvider {
-	return func(client *api.Client) error {
-		glog.V(2).Info("authenticating using kubernetes service account")
+type AuthProviderKubernetes struct {
+	Mount     string
+	Role      string
+	TokenFile string
+}
 
-		glog.V(3).Infof("reading service token file %s", tokenfile)
-		token, err := ioutil.ReadFile(tokenfile)
-		if err != nil {
-			return errors.Wrap(err, "reading service token file")
-		}
+func (p AuthProviderKubernetes) String() string {
+	return "kubernetes"
+}
 
-		glog.V(3).Infof("attempting kubernetes authentication mount=%s role=%s", mount, role)
-		secret, err := client.Logical().Write(
-			fmt.Sprintf("auth/%s/login", mount),
-			map[string]interface{}{
-				"role": role,
-				"jwt":  string(token),
-			},
-		)
+// Auth implements AuthProvider
+func (p AuthProviderKubernetes) Auth(client *api.Client) error {
+	glog.V(2).Info("authenticating using kubernetes service account")
 
-		if err != nil {
-			return errors.Wrap(err, "authenticating with service token")
-		}
-
-		if secret.Auth == nil {
-			return ErrNoAuthInfo
-		}
-
-		client.SetToken(secret.Auth.ClientToken)
-
-		return nil
+	glog.V(3).Infof("reading service token file %s", p.TokenFile)
+	token, err := ioutil.ReadFile(p.TokenFile)
+	if err != nil {
+		return errors.Wrap(err, "reading service token file")
 	}
+
+	glog.V(3).Infof("attempting kubernetes authentication mount=%s role=%s", p.Mount, p.Role)
+	secret, err := client.Logical().Write(
+		fmt.Sprintf("auth/%s/login", p.Mount),
+		map[string]interface{}{
+			"role": p.Role,
+			"jwt":  string(token),
+		},
+	)
+
+	if err != nil {
+		return errors.Wrap(err, "authenticating with service token")
+	}
+
+	if secret.Auth == nil {
+		return ErrNoAuthInfo
+	}
+
+	client.SetToken(secret.Auth.ClientToken)
+
+	return nil
+}
+
+type AuthProviderAppRole struct {
+	Mount    string
+	RoleID   string
+	SecretID string
+}
+
+func (p AuthProviderAppRole) String() string {
+	return "approle"
 }
 
 // AppRoleAuth authenticates against Vault using an approle and secret.
-func AppRoleAuth(mount, roleID, secretID string) AuthProvider {
-	return func(client *api.Client) error {
-		glog.V(2).Info("authenticating using approle")
+func (p AuthProviderAppRole) Auth(client *api.Client) error {
+	glog.V(2).Info("authenticating using approle")
 
-		glog.V(3).Infof("attempting approle authentication roleid=%s", roleID)
-		secret, err := client.Logical().Write(
-			fmt.Sprintf("auth/%s/login", mount),
-			map[string]interface{}{
-				"role_id":   roleID,
-				"secret_id": secretID,
-			},
-		)
+	glog.V(3).Infof("attempting approle authentication roleid=%s", p.RoleID)
+	secret, err := client.Logical().Write(
+		fmt.Sprintf("auth/%s/login", p.Mount),
+		map[string]interface{}{
+			"role_id":   p.RoleID,
+			"secret_id": p.SecretID,
+		},
+	)
 
-		if err != nil {
-			return errors.Wrap(err, "authenticating with approle")
-		}
-
-		if secret.Auth == nil {
-			return ErrNoAuthInfo
-		}
-
-		client.SetToken(secret.Auth.ClientToken)
-
-		return nil
+	if err != nil {
+		return errors.Wrap(err, "authenticating with approle")
 	}
+
+	if secret.Auth == nil {
+		return ErrNoAuthInfo
+	}
+
+	client.SetToken(secret.Auth.ClientToken)
+
+	return nil
 }

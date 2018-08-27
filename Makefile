@@ -38,6 +38,12 @@ build: $(addprefix bin/,$(addsuffix /$(BINARY),$(PLATFORMS)))
 clean:	
 	rm -rf bin release vendor
 
+.PHONY: docs
+docs: GOOS= 
+docs: GOARCH=
+docs:
+	@$(RUN_GO) run ./cmd/$(BINARY)/main.go docs ./docs
+
 .SECONDEXPANSION: 
 release/%: bin/$$(GOOS)-$$(GOARCH)/$(BINARY)
 	@mkdir -p release

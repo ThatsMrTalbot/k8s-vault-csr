@@ -16,16 +16,10 @@ var ErrNoAuthProvider = errors.New("no vault authentication method provided")
 // NewRenewer creates a Vault token renewer that will renew tokens halfway
 // through their lifespan. If an auth method is provided then the controller
 // can also authenticate against Vault if a authentication method is provided
-func NewRenewer(client *api.Client, authFn func(*api.Client) error) *Renewer {
-	if authFn == nil {
-		authFn = func(*api.Client) error {
-			return ErrNoAuthProvider
-		}
-	}
-
+func NewRenewer(client *api.Client, authProvider AuthProvider) *Renewer {
 	return &Renewer{
-		client: client,
-		authFn: authFn,
+		client:       client,
+		authProvider: authProvider,
 	}
 }
 
@@ -66,8 +60,12 @@ func (r *Renewer) currentTokenStatus() (*tokenStatus, error) {
 }
 
 func (r *Renewer) auth() error {
-	err := r.authFn(r.client)
-	return errors.Wrap(err, "authenticating with vault")
+	if r.authProvider != nil {
+		err := r.authProvider.Auth(r.client)
+		return errors.Wrap(err, "authenticating with vault")
+	}
+
+	return ErrNoAuthProvider
 }
 
 func (r *Renewer) renew() error {
@@ -98,6 +96,11 @@ func (r *Renewer) tick() error {
 	}
 
 	return nil
+}
+
+// RunOnce runs the renew/auth action once
+func (r *Renewer) RunOnce() error {
+	return r.tick()
 }
 
 // Run starts the renewer loop until stopped or an error occurs
