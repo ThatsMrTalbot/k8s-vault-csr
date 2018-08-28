@@ -4,6 +4,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
+	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/controller/certificate/bootstrap"
 	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/util"
 	"github.com/thatsmrtalbot/k8s-vault-csr/pkg/vault/token"
 	"k8s.io/client-go/tools/clientcmd"
@@ -67,9 +68,9 @@ var Cmd = &cobra.Command{
 		var key, cert, ca []byte
 
 		if signVerbatim {
-			key, cert, ca, err = createBootstrapCertWithSignVerbatim(client)
+			key, cert, ca, err = bootstrap.CreateBootstrapCertWithSignVerbatim(client, pkiMount, pkiRole, pkiTTL, nodeName, "system:bootstrappers")
 		} else {
-			key, cert, ca, err = createBootstrapCertWithIssue(client)
+			key, cert, ca, err = bootstrap.CreateBootstrapCertWithIssue(client, pkiMount, pkiRole, pkiTTL, nodeName)
 		}
 
 		if err != nil {
