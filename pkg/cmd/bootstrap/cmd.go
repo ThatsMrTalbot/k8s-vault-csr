@@ -14,7 +14,8 @@ import (
 
 var (
 	// Bootstrap flags
-	nodeName string
+	nodeName  string
+	groupName string
 
 	// Vault generic flags
 	vaultAddr string
@@ -68,7 +69,7 @@ var Cmd = &cobra.Command{
 		var key, cert, ca []byte
 
 		if signVerbatim {
-			key, cert, ca, err = bootstrap.CreateBootstrapCertWithSignVerbatim(client, pkiMount, pkiRole, pkiTTL, nodeName, "system:bootstrappers")
+			key, cert, ca, err = bootstrap.CreateBootstrapCertWithSignVerbatim(client, pkiMount, pkiRole, pkiTTL, nodeName, groupName)
 		} else {
 			key, cert, ca, err = bootstrap.CreateBootstrapCertWithIssue(client, pkiMount, pkiRole, pkiTTL, nodeName)
 		}
@@ -108,6 +109,7 @@ var Cmd = &cobra.Command{
 
 func init() {
 	Cmd.Flags().StringVar(&nodeName, "node-name", "", "node name to use in the bootstrap certificate")
+	Cmd.Flags().StringVar(&groupName, "group-name", "system:bootstrappers", "group name to use in the bootstrap certificate")
 	Cmd.Flags().StringVar(&vaultAddr, "vault-address", "", "vault server address")
 	Cmd.Flags().StringVar(&pkiMount, "vault-pki-mount", "pki", "specify the pki mount to use to generate certificates")
 	Cmd.Flags().StringVar(&pkiRole, "vault-pki-role", "", "specify role to use, only ttl is used from the role")
