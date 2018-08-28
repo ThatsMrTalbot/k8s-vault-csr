@@ -2,13 +2,21 @@
 
 # Kubernetes CSR Vault Controller
 
-Kubernetes supports the approval and signing of x509 Certificate Signing Requests. This can be used internally by Kubernetes for things such as kubelet client certificate rotation. Typically CSRs are signed by the controller-manager with a provided CA and key.
+Kubernetes supports the approval and signing of x509 Certificate Signing Requests. This can be used internally by Kubernetes for things such as Kubelet client certificate rotation. Typically CSRs are signed by the controller-manager with a provided CA and key.
 
-This project replaces that controller with a signer that uses Vault to sign the approved CSR objects. This allows kubelet certificate rotation, and indeed all in cluster certificate signing to be delegated to Hashicorp Vault.
+This project replaces that controller with a signer that uses Vault to sign the approved CSR objects. This allows Kubelet certificate rotation, and indeed all in cluster certificate signing to be delegated to Hashicorp Vault.
 
 ## How it works
 
+### Controller 
+
 This controller uses much of the same code as the default Kubernetes CSR signer, the only difference is the function that performs the signing. For this is uses the `sign-verbatim` endpoint provided by the Vault PKI mount to sign the CSR. 
+
+### Bootstrapping
+
+Before nodes can rotate their own certs they must generate their initial certs, this is done using a bootstrap kubeconfig. Typically this uses a bootstap token, however certs are a valid option and allow for Vault to manage the access for bootstrapping nodes, not Kubernetes. This tool includes a command to generate a bootstrap kubeconfig which can be used to request the initial node certificate. 
+
+Another use case is creating node certificates as part of cluster bootstrap. If for example you are using bootkube then you need kublet to be running in order to bring up the tempoary control plane. But Kubelet will not start until it can connect to an APIServer and issue its initial node certs, creating a chicken and egg senareo. However if you generate Kubelets node certs using this tool (with the group `system:nodes`) on the node you are trying to bootstrap then you can avoid this and get a running Kubelet which can be used to bring up the tempoary control plane. This control plane can then handle the issuing of certificates for further Kubelets.
 
 ## Requirements
 
