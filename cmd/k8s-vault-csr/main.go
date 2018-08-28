@@ -76,6 +76,6 @@ func init() {
 func main() {
 	err := rootCmd.Execute()
 	if err != nil {
-		glog.Exitf("error: ", err)
+		glog.Exitf("error: %s", err)
 	}
 }
